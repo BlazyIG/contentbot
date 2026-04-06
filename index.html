@@ -223,27 +223,47 @@
 <script>
 let appState = { niche: '', format: '', mode: 'planificacion', isLoading: false };
 
+// 1. Inicialización de OneSignal con tu ID real
 window.OneSignalDeferred = window.OneSignalDeferred || [];
 OneSignalDeferred.push(async function(OneSignal) {
-  await OneSignal.init({ appId: 2c01860a-1912-4c9a-8250-70d822f61be3 }); // <-- ¡Cambiar luego!
+  await OneSignal.init({ appId: "2c01860a-1912-4c9a-8250-70d822f61be3" });
 });
 
 function isIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream; }
 function isInStandaloneMode() { return window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches; }
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
 
+// 2. Gestión de permisos de notificación segura
 async function requestNotifPermission() {
-  if (!('Notification' in window)) { skipNotifs(); return; }
-  if (isIOS() && !isInStandaloneMode()) { showScreen('screen-ios-gate'); return; }
-  const perm = await Notification.requestPermission();
-  if (perm === 'granted') showScreen('screen-onboard');
-  else if (perm === 'denied') showScreen('screen-blocked');
-  else skipNotifs();
+  try {
+    if (isIOS() && !isInStandaloneMode()) { showScreen('screen-ios-gate'); return; }
+    if (!('Notification' in window)) { skipNotifs(); return; }
+    
+    let perm = Notification.permission;
+    if (perm === 'default') { 
+      perm = await Notification.requestPermission(); 
+    }
+    
+    if (perm === 'granted') { showScreen('screen-onboard'); } 
+    else if (perm === 'denied') { showScreen('screen-blocked'); } 
+    else { skipNotifs(); }
+  } catch (error) {
+    skipNotifs(); 
+  }
 }
+
 function checkIOSInstalled() { if (isInStandaloneMode()) requestNotifPermission(); else alert('Abre la app desde tu inicio.'); }
 function skipNotifs() { showScreen('screen-onboard'); }
 
-document.getElementById('setup-niche').addEventListener('change', () => { document.getElementById('start-btn').disabled = !document.getElementById('setup-niche').value; });
+// 3. Lógica del Onboarding
+document.getElementById('setup-niche').addEventListener('change', checkReady);
+document.getElementById('setup-format').addEventListener('change', checkReady);
+
+function checkReady() {
+  const n = document.getElementById('setup-niche').value;
+  const f = document.getElementById('setup-format').value;
+  document.getElementById('start-btn').disabled = !(n && f);
+}
 
 function startApp() {
   appState.niche = document.getElementById('setup-niche').value;
@@ -252,6 +272,7 @@ function startApp() {
   showScreen('screen-main');
 }
 
+// 4. Lógica del Chat y Generación
 function sendQuick(t) { document.getElementById('chat-input').value = t; sendMessage(); }
 function generateScripts() { document.getElementById('chat-input').value = 'Dame las noticias de hoy'; sendMessage(); }
 
