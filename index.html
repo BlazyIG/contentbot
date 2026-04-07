@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ContentBot — Tu Asistente de Contenido</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0b0d;
+    --bg2: #111318;
+    --surface: #1e2330;
+    --surface2: #252b3b;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --green: #25d366;
+    --green2: #1aaf4f;
+    --green-dim: rgba(37,211,102,0.12);
+    --text: #f0f2f5;
+    --text2: #8696a0;
+    --text3: #4a5568;
+    --accent: #00c2ff;
+    --accent-dim: rgba(0,194,255,0.1);
+    --red: #ff6b6b;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', monospace; overflow: hidden; }
+  #app { height: 100vh; display: flex; flex-direction: column; position: relative; }
+
+  /* ── SCREENS ── */
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; transition: opacity 0.4s, transform 0.4s; }
+  .screen.hidden { opacity: 0; pointer-events: none; transform: translateY(20px); }
+
+  /* ── GATES ── */
+  #screen-notif-gate, #screen-ios-gate, #screen-blocked {
+    justify-content: center; align-items: center; padding: 24px;
+    background: var(--bg);
+  }
+  #screen-notif-gate { background-image: radial-gradient(ellipse at 50% 30%, rgba(37,211,102,0.06) 0%, transparent 60%); }
+  #screen-ios-gate   { background-image: radial-gradient(ellipse at 50% 30%, rgba(0,194,255,0.06) 0%, transparent 60%); }
+  #screen-blocked    { background-image: radial-gradient(ellipse at 50% 30%, rgba(255,107,107,0.06) 0%, transparent 60%); }
+
+  .gate-inner { width: 100%; max-width: 440px; text-align: center; display: flex; flex-direction: column; align-items: center; }
+  .gate-icon { width: 80px; height: 80px; border-radius: 24px; margin-bottom: 28px; display: flex; align-items: center; justify-content: center; font-size: 36px; position: relative; }
+  .gate-icon.green { background: var(--green-dim); border: 1px solid rgba(37,211,102,0.25); }
+  .gate-icon.blue  { background: var(--accent-dim); border: 1px solid rgba(0,194,255,0.25); }
+  .gate-icon.red   { background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.25); }
+  .gate-icon-ring  { position: absolute; inset: -8px; border-radius: 32px; border: 1px solid rgba(37,211,102,0.12); animation: ring-pulse 2.5s ease infinite; }
+  .gate-icon-ring.blue-ring { border-color: rgba(0,194,255,0.12); }
+  @keyframes ring-pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.06);opacity:0.5} }
+
+  .gate-title { font-family: 'Syne', sans-serif; font-size: clamp(22px,5vw,32px); font-weight: 800; line-height: 1.15; margin-bottom: 14px; }
+  .gate-title .hl-green { color: var(--green); }
+  .gate-title .hl-red   { color: var(--red); }
+  .gate-sub { font-size: 13px; color: var(--text2); line-height: 1.8; margin-bottom: 28px; max-width: 380px; }
+  .gate-sub strong { color: var(--text); font-weight: 500; }
+
+  .value-pills { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 28px; }
+  .value-pill { font-size: 12px; padding: 6px 14px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border2); color: var(--text2); }
+
+  .btn-gate {
+    width: 100%; max-width: 340px; background: var(--green); color: #000;
+    font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700;
+    padding: 15px 24px; border: none; border-radius: var(--radius-sm); cursor: pointer;
+    transition: background 0.2s, transform 0.1s; position: relative; overflow: hidden;
+  }
+  .btn-gate::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent); transform:translateX(-100%); animation:shimmer 2.5s infinite; }
+  @keyframes shimmer { 0%{transform:translateX(-100%)} 60%,100%{transform:translateX(100%)} }
+  .btn-gate:hover { background: #1fc75c; }
+  .btn-gate:active { transform: scale(0.98); }
+
+  .btn-gate-red { width:100%; max-width:340px; background:var(--red); color:#fff; font-family:'Syne',sans-serif; font-size:15px; font-weight:700; padding:15px 24px; border:none; border-radius:var(--radius-sm); cursor:pointer; }
+  .btn-gate-secondary { margin-top: 14px; background: none; border: none; cursor: pointer; font-size: 12px; color: var(--text3); font-family: 'JetBrains Mono', monospace; text-decoration: underline; }
+  .btn-gate-secondary:hover { color: var(--text2); }
+
+  .ios-steps { width:100%; max-width:380px; display:flex; flex-direction:column; gap:12px; margin-bottom:28px; }
+  .ios-step { background:var(--surface); border:1px solid var(--border2); border-radius:var(--radius-sm); padding:14px 16px; display:flex; align-items:flex-start; gap:14px; text-align:left; }
+  .ios-step-num { width:28px; height:28px; border-radius:50%; background:var(--accent-dim); border:1px solid rgba(0,194,255,0.3); color:var(--accent); font-size:12px; font-weight:500; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .ios-step-text { font-size:13px; color:var(--text2); line-height:1.6; }
+  .ios-step-text strong { color:var(--text); font-weight:500; }
+
+  .blocked-steps { width:100%; max-width:380px; background:var(--surface); border:1px solid var(--border2); border-radius:var(--radius-sm); padding:16px; margin-bottom:28px; text-align:left; }
+  .blocked-step { display:flex; gap:12px; padding:8px 0; border-bottom:1px solid var(--border); }
+  .blocked-step:last-child { border-bottom:none; padding-bottom:0; }
+  .blocked-step-n { font-size:11px; color:var(--red); font-weight:500; flex-shrink:0; padding-top:1px; }
+  .blocked-step-t { font-size:12px; color:var(--text2); line-height:1.6; }
+  .blocked-step-t strong { color:var(--text); }
+
+  /* ── ONBOARDING ── */
+  #screen-onboard {
+    justify-content: center; align-items: center; padding: 24px;
+    background: var(--bg);
+    background-image: radial-gradient(ellipse at 20% 50%, rgba(37,211,102,0.04) 0%, transparent 60%),
+                      radial-gradient(ellipse at 80% 20%, rgba(0,194,255,0.04) 0%, transparent 60%);
+  }
+  .onboard-inner { width: 100%; max-width: 520px; }
+  .logo-mark { display:inline-flex; align-items:center; gap:10px; font-family:'Syne',sans-serif; font-size:22px; font-weight:800; margin-bottom:36px; }
+  .logo-icon { width:40px; height:40px; border-radius:12px; background:var(--green); display:flex; align-items:center; justify-content:center; font-size:20px; }
+  .logo-dot { color: var(--green); }
+  .onboard-title { font-family:'Syne',sans-serif; font-size:clamp(26px,5vw,38px); font-weight:800; line-height:1.1; margin-bottom:12px; }
+  .onboard-title span { color: var(--green); }
+  .onboard-sub { font-size:13px; color:var(--text2); line-height:1.7; margin-bottom:36px; }
+
+  .field { margin-bottom: 20px; }
+  .field label { display:block; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text2); margin-bottom:8px; }
+  .field select, .field input, .field textarea {
+    width:100%; background:var(--surface); border:1px solid var(--border2); border-radius:var(--radius-sm);
+    color:var(--text); font-family:'JetBrains Mono',monospace; font-size:14px; padding:12px 16px; outline:none;
+    transition:border-color 0.2s; -webkit-appearance:none;
+  }
+  .field select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238696a0' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 14px center; padding-right:36px; cursor:pointer; }
+  .field select option { background:#1e2330; }
+  .field select:focus, .field input:focus { border-color: var(--green); }
+
+  .mode-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .mode-card { background:var(--surface); border:1px solid var(--border2); border-radius:var(--radius-sm); padding:14px 16px; cursor:pointer; transition:border-color 0.2s, background 0.2s; }
+  .mode-card:hover { border-color:var(--green); background:var(--surface2); }
+  .mode-card.selected { border-color:var(--green); background:var(--green-dim); }
+  .mode-card-title { font-size:13px; font-weight:500; color:var(--text); margin-bottom:4px; }
+  .mode-card-sub { font-size:11px; color:var(--text2); line-height:1.5; }
+  .mode-badge { display:inline-block; font-size:9px; padding:2px 8px; border-radius:20px; background:var(--green-dim); color:var(--green); margin-bottom:8px; letter-spacing:0.05em; }
+
+  .btn-primary { width:100%; background:var(--green); color:#000; font-family:'Syne',sans-serif; font-size:15px; font-weight:700; padding:14px 24px; border:none; border-radius:var(--radius-sm); cursor:pointer; transition:background 0.2s, transform 0.1s; margin-top:8px; }
+  .btn-primary:hover { background: #1fc75c; }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { background:var(--surface2); color:var(--text3); cursor:not-allowed; }
+
+  /* ── MAIN ── */
+  #screen-main { background:var(--bg); flex-direction:row; }
+
+  .sidebar { width:300px; flex-shrink:0; background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; }
+  .sidebar-header { padding:20px 20px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .sidebar-logo { font-family:'Syne',sans-serif; font-size:16px; font-weight:800; }
+  .sidebar-logo span { color: var(--green); }
+  .status-dot { width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); animation:pulse-dot 2s infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .profile-card { margin:16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; }
+  .profile-label { font-size:10px; color:var(--text3); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px; }
+  .profile-niche { font-size:12px; color:var(--text); line-height:1.5; }
+  .profile-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .tag { font-size:10px; padding:3px 8px; border-radius:20px; background:var(--green-dim); color:var(--green); }
+
+  .sidebar-divider { font-size:10px; color:var(--text3); letter-spacing:0.1em; text-transform:uppercase; padding:16px 20px 8px; }
+  .history-list { flex:1; overflow-y:auto; padding:0 12px 16px; }
+  .history-item { padding:10px 12px; border-radius:var(--radius-sm); cursor:pointer; transition:background 0.15s; margin-bottom:4px; display:flex; align-items:flex-start; gap:10px; }
+  .history-item:hover { background:var(--surface); }
+  .history-item.active { background:var(--surface); border-left:2px solid var(--green); }
+  .history-title { font-size:12px; color:var(--text); }
+  .history-meta { font-size:10px; color:var(--text3); margin-top:2px; }
+
+  .sidebar-actions { padding:16px; border-top:1px solid var(--border); }
+  .btn-sidebar { width:100%; background:var(--green); color:#000; font-family:'Syne',sans-serif; font-size:13px; font-weight:700; padding:11px; border:none; border-radius:var(--radius-sm); cursor:pointer; transition:background 0.2s; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .btn-sidebar:hover { background: #1fc75c; }
+  .btn-sidebar:disabled { background:var(--surface2); color:var(--text3); cursor:not-allowed; }
+
+  .chat-area { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .chat-header { padding:16px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+  .chat-title { font-family:'Syne',sans-serif; font-size:16px; font-weight:700; }
+  .chat-subtitle { font-size:11px; color:var(--text2); margin-top:2px; }
+  .icon-btn { width:36px; height:36px; border-radius:8px; background:var(--surface); border:1px solid var(--border); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:border-color 0.2s; color:var(--text2); font-size:16px; }
+  .icon-btn:hover { border-color:var(--border2); color:var(--text); }
+  .mobile-menu-btn { display:none; width:36px; height:36px; border-radius:8px; background:var(--surface); border:1px solid var(--border); cursor:pointer; align-items:center; justify-content:center; color:var(--text2); font-size:18px; }
+
+  .chat-messages { flex:1; overflow-y:auto; padding:24px; display:flex; flex-direction:column; gap:20px; }
+  .chat-messages::-webkit-scrollbar { width:4px; }
+  .chat-messages::-webkit-scrollbar-thumb { background:var(--border2); border-radius:10px; }
+
+  .msg-system { text-align:center; font-size:11px; color:var(--text3); background:var(--surface); border-radius:20px; padding:6px 16px; align-self:center; max-width:400px; }
+  .msg-user { align-self:flex-end; max-width:60%; background:var(--green2); color:#fff; border-radius:16px 16px 4px 16px; padding:10px 16px; font-size:13px; line-height:1.6; }
+  .msg-bot { align-self:flex-start; width:100%; max-width:700px; }
+
+  .script-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; transition:border-color 0.2s; }
+  .script-card:hover { border-color:var(--border2); }
+  .script-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+  .script-num { font-size:10px; color:var(--green); letter-spacing:0.1em; text-transform:uppercase; background:var(--green-dim); padding:3px 10px; border-radius:20px; flex-shrink:0; margin-top:2px; }
+  .script-headline { font-family:'Syne',sans-serif; font-size:15px; font-weight:700; color:var(--text); line-height:1.4; flex:1; }
+  .script-source { font-size:11px; color:var(--accent); margin-top:6px; }
+  .script-source a { color:var(--accent); text-decoration:none; }
+  .script-source a:hover { text-decoration:underline; }
+  .script-body { padding:20px; display:grid; gap:16px; }
+  .script-section { display:grid; gap:8px; }
+  .section-label { font-size:10px; letter-spacing:0.1em; text-transform:uppercase; display:flex; align-items:center; gap:8px; }
+  .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+  .label-gancho { color:#ff6b6b; }
+  .label-cuerpo { color:var(--accent); }
+  .label-cta   { color:var(--green); }
+  .section-text { font-size:13px; color:var(--text2); line-height:1.8; }
+  .script-footer { padding:12px 20px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .script-meta { font-size:11px; color:var(--text3); display:flex; gap:16px; }
+  .script-copy { font-size:11px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:6px 14px; cursor:pointer; color:var(--text2); font-family:'JetBrains Mono',monospace; transition:color 0.2s, border-color 0.2s; }
+  .script-copy:hover { color:var(--green); border-color:var(--green); }
+  .script-copy.copied { color:var(--green); border-color:var(--green); }
+
+  .loading-msg { align-self:flex-start; background:var(--bg2); border:1px solid var(--border); border-radius:16px 16px 16px 4px; padding:14px 20px; display:flex; align-items:center; gap:12px; }
+  .loading-dots { display:flex; gap:5px; }
+  .loading-dots span { width:6px; height:6px; border-radius:50%; background:var(--green); animation:bounce 1.2s infinite; }
+  .loading-dots span:nth-child(2) { animation-delay:0.2s; }
+  .loading-dots span:nth-child(3) { animation-delay:0.4s; }
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+  .loading-text { font-size:12px; color:var(--text2); }
+
+  .welcome-state { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px; text-align:center; gap:16px; }
+  .welcome-icon { width:72px; height:72px; border-radius:20px; background:var(--green-dim); display:flex; align-items:center; justify-content:center; font-size:32px; margin-bottom:8px; }
+  .welcome-title { font-family:'Syne',sans-serif; font-size:22px; font-weight:700; }
+  .welcome-sub { font-size:13px; color:var(--text2); line-height:1.7; max-width:380px; }
+  .quick-btns { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:8px; }
+  .quick-btn { font-size:12px; padding:8px 16px; border-radius:20px; background:var(--surface); border:1px solid var(--border2); color:var(--text2); cursor:pointer; font-family:'JetBrains Mono',monospace; transition:all 0.2s; }
+  .quick-btn:hover { border-color:var(--green); color:var(--green); background:var(--green-dim); }
+
+  .chat-input-area { padding:16px 24px; border-top:1px solid var(--border); flex-shrink:0; display:flex; align-items:flex-end; gap:12px; }
+  .chat-input { width:100%; background:var(--surface); border:1px solid var(--border2); border-radius:12px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:13px; padding:12px 16px; outline:none; resize:none; line-height:1.6; max-height:120px; transition:border-color 0.2s; }
+  .chat-input:focus { border-color: var(--green); }
+  .chat-input::placeholder { color: var(--text3); }
+  .send-btn { width:44px; height:44px; border-radius:12px; background:var(--green); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.2s, transform 0.1s; flex-shrink:0; }
+  .send-btn:hover { background: #1fc75c; }
+  .send-btn:active { transform: scale(0.95); }
+  .send-btn:disabled { background:var(--surface2); cursor:not-allowed; }
+  .send-btn svg { width:18px; height:18px; fill:none; stroke:#000; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .send-btn:disabled svg { stroke: var(--text3); }
+
+  /* Settings modal */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100; display:flex; align-items:center; justify-content:center; padding:24px; opacity:0; pointer-events:none; transition:opacity 0.2s; }
+  .modal-overlay.open { opacity:1; pointer-events:all; }
+  .modal { background:var(--bg2); border:1px solid var(--border2); border-radius:var(--radius); padding:28px; width:100%; max-width:480px; max-height:80vh; overflow-y:auto; }
+  .modal-title { font-family:'Syne',sans-serif; font-size:18px; font-weight:700; margin-bottom:20px; }
+  .modal-actions { display:flex; gap:8px; margin-top:24px; }
+  .btn-secondary { flex:1; background:var(--surface); border:1px solid var(--border2); color:var(--text2); font-family:'JetBrains Mono',monospace; font-size:13px; padding:11px; border-radius:var(--radius-sm); cursor:pointer; }
+  .modal-save { flex:1; background:var(--green); color:#000; font-family:'Syne',sans-serif; font-size:13px; font-weight:700; padding:11px; border:none; border-radius:var(--radius-sm); cursor:pointer; }
+
+  @media (max-width: 768px) {
+    .sidebar { position:absolute; z-index:10; height:100%; transform:translateX(-100%); transition:transform 0.3s; }
+    .sidebar.open { transform:translateX(0); }
+    .mobile-menu-btn { display:flex; }
+    .chat-messages { padding:16px; }
+    .chat-header, .chat-input-area { padding:12px 16px; }
+  }
+
+  .fade-in { animation: fadeIn 0.3s ease forwards; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  * { scrollbar-width:thin; scrollbar-color:var(--border2) transparent; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── NOTIF GATE ── -->
+  <div class="screen" id="screen-notif-gate">
+    <div class="gate-inner">
+      <div class="gate-icon green">🔔<div class="gate-icon-ring"></div></div>
+      <h1 class="gate-title">Sin alertas,<br><span class="hl-green">no hay primicia</span></h1>
+      <p class="gate-sub">ContentBot necesita avisarte en el momento exacto en que sale la noticia.<br><br>Sin eso, llegarás tarde. <strong>Con eso, serás el primero en publicar.</strong></p>
+      <div class="value-pills">
+        <div class="value-pill">⚡ Alerta al instante</div>
+        <div class="value-pill">📋 Guión listo incluido</div>
+        <div class="value-pill">🚫 Sin abrir TikTok</div>
+      </div>
+      <button class="btn-gate" onclick="requestNotifPermission()">🔔 Activar alertas y continuar</button>
+      <button class="btn-gate-secondary" onclick="skipNotifs()">Omitir por ahora (perderé primicias)</button>
+    </div>
+  </div>
+
+  <!-- ── iOS GATE ── -->
+  <div class="screen hidden" id="screen-ios-gate">
+    <div class="gate-inner">
+      <div class="gate-icon blue">📱<div class="gate-icon-ring blue-ring"></div></div>
+      <h1 class="gate-title">Un paso extra<br><span style="color:var(--accent)">en iPhone</span></h1>
+      <p class="gate-sub">Apple exige añadir ContentBot a tu pantalla de inicio antes de activar notificaciones push. Son 30 segundos.</p>
+      <div class="ios-steps">
+        <div class="ios-step"><div class="ios-step-num">1</div><div class="ios-step-text">Toca el botón de <strong>compartir ⬆</strong> en la barra inferior de Safari</div></div>
+        <div class="ios-step"><div class="ios-step-num">2</div><div class="ios-step-text">Desplázate y toca <strong>"Añadir a la pantalla de inicio"</strong> → "Añadir"</div></div>
+        <div class="ios-step"><div class="ios-step-num">3</div><div class="ios-step-text">Abre <strong>ContentBot desde tu pantalla de inicio</strong> y activa las notificaciones ahí</div></div>
+      </div>
+      <button class="btn-gate" style="background:var(--accent);color:#000;" onclick="checkIOSInstalled()">Ya lo añadí, continuar →</button>
+      <button class="btn-gate-secondary" onclick="skipNotifs()">Omitir (sin alertas en tiempo real)</button>
+    </div>
+  </div>
+
+  <!-- ── BLOCKED GATE ── -->
+  <div class="screen hidden" id="screen-blocked">
+    <div class="gate-inner">
+      <div class="gate-icon red">🚫</div>
+      <h1 class="gate-title">Notificaciones<br><span class="hl-red">bloqueadas</span></h1>
+      <p class="gate-sub">ContentBot no puede avisarte sin acceso a las alertas. Reactívalas en 3 pasos:</p>
+      <div class="blocked-steps">
+        <div class="blocked-step"><div class="blocked-step-n">01</div><div class="blocked-step-t">Toca el <strong>🔒 candado</strong> en la barra de direcciones del navegador</div></div>
+        <div class="blocked-step"><div class="blocked-step-n">02</div><div class="blocked-step-t">Busca <strong>"Notificaciones"</strong> y cámbialo de "Bloqueado" a <strong>"Permitir"</strong></div></div>
+        <div class="blocked-step"><div class="blocked-step-n">03</div><div class="blocked-step-t">Recarga la página y acepta el permiso cuando aparezca</div></div>
+      </div>
+      <button class="btn-gate-red" onclick="location.reload()">🔄 Ya lo activé, recargar</button>
+      <button class="btn-gate-secondary" onclick="skipNotifs()">Continuar sin alertas</button>
+    </div>
+  </div>
+
+  <!-- ── ONBOARDING ── -->
+  <div class="screen hidden" id="screen-onboard">
+    <div class="onboard-inner" style="max-width:520px;margin:auto;padding:24px;overflow-y:auto;max-height:100vh;">
+      <div class="logo-mark">
+        <div class="logo-icon">📡</div>
+        Content<span class="logo-dot">Bot</span>
+      </div>
+      <h1 class="onboard-title">Tu asistente de<br><span>contenido en tiempo real</span></h1>
+      <p class="onboard-sub">Configura tu perfil y recibe guiones listos para grabar basados en las noticias de ahora mismo. Sin investigar. Sin hoja en blanco.</p>
+
+      <div class="field">
+        <label>Tu temática principal</label>
+        <select id="setup-niche">
+          <option value="">Selecciona tu nicho...</option>
+          <option value="Inteligencia Artificial y herramientas de IA">Inteligencia Artificial</option>
+          <option value="tecnología y gadgets">Tecnología y gadgets</option>
+          <option value="negocios y emprendimiento">Negocios y emprendimiento</option>
+          <option value="marketing digital y redes sociales">Marketing digital</option>
+          <option value="finanzas personales y crypto">Finanzas personales y crypto</option>
+          <option value="ciencia y divulgación">Ciencia y divulgación</option>
+          <option value="salud y bienestar">Salud y bienestar</option>
+          <option value="noticias de actualidad">Actualidad general</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Formato de tu contenido</label>
+        <select id="setup-format">
+          <option value="">Selecciona tu formato...</option>
+          <option value="vídeos cortos (Reels / TikTok / Shorts)">Vídeos cortos (Reels/TikTok/Shorts)</option>
+          <option value="vídeos largos de YouTube">Vídeos largos de YouTube</option>
+          <option value="hilos de X (Twitter)">Hilos de X (Twitter)</option>
+          <option value="posts de LinkedIn">Posts de LinkedIn</option>
+          <option value="newsletters">Newsletter</option>
+          <option value="podcasts">Podcast</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Modalidad de entrega</label>
+        <div class="mode-grid">
+          <div class="mode-card selected" id="mode-planificacion" onclick="selectMode('planificacion')">
+            <div class="mode-badge">PLANIFICACIÓN</div>
+            <div class="mode-card-title">📋 Batch matutino</div>
+            <div class="mode-card-sub">5 guiones juntos a las 10:00 AM para organizar tu día</div>
+          </div>
+          <div class="mode-card" id="mode-goteo" onclick="selectMode('goteo')">
+            <div class="mode-badge">GOTEO</div>
+            <div class="mode-card-title">⚡ Alertas en tiempo real</div>
+            <div class="mode-card-sub">5 alertas distribuidas de 10:00 a 22:00 según salen</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="start-btn" onclick="startApp()" disabled>Activar ContentBot →</button>
+    </div>
+  </div>
+
+  <!-- ── MAIN APP ── -->
+  <div class="screen hidden" id="screen-main">
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">Content<span>Bot</span></div>
+        <div class="status-dot"></div>
+      </div>
+      <div class="profile-card">
+        <div class="profile-label">Tu perfil activo</div>
+        <div class="profile-niche" id="profile-display">—</div>
+        <div class="profile-tags" id="profile-tags"></div>
+      </div>
+      <div class="sidebar-divider">Sesiones</div>
+      <div class="history-list" id="history-list">
+        <div class="history-item active">
+          <div style="font-size:16px;">📡</div>
+          <div>
+            <div class="history-title">Sesión actual</div>
+            <div class="history-meta">Ahora mismo</div>
+          </div>
+        </div>
+      </div>
+      <div class="sidebar-actions">
+        <button class="btn-sidebar" id="generate-btn" onclick="generateScripts()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          Generar guiones ahora
+        </button>
+      </div>
+    </div>
+
+    <div class="chat-area">
+      <div class="chat-header">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+          <div>
+            <div class="chat-title" id="chat-title">ContentBot</div>
+            <div class="chat-subtitle" id="chat-subtitle">Listo para generar contenido</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="icon-btn" onclick="openSettings()" title="Configuración">⚙</button>
+        </div>
+      </div>
+
+      <div class="chat-messages" id="chat-messages">
+        <div class="welcome-state" id="welcome-state">
+          <div class="welcome-icon">📡</div>
+          <div class="welcome-title">Todo listo, creador</div>
+          <div class="welcome-sub">Pulsa "Generar guiones ahora" o pídeme algo específico. Buscaré las últimas noticias de tu nicho y te entregaré guiones listos para grabar.</div>
+          <div class="quick-btns">
+            <button class="quick-btn" onclick="sendQuick('Dame los 5 guiones de hoy')">📋 Guiones de hoy</button>
+            <button class="quick-btn" onclick="sendQuick('Dame la noticia más viral de ahora mismo')">🔥 Más viral ahora</button>
+            <button class="quick-btn" onclick="sendQuick('Busca algo que nadie está cubriendo todavía')">💎 Primicias</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-input-area">
+        <textarea class="chat-input" id="chat-input" placeholder="Pide algo específico... ej: 'Dame guiones sobre la última actualización de ChatGPT'" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendMessage()">
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeSettingsOutside(event)">
+  <div class="modal">
+    <div class="modal-title">⚙ Configuración</div>
+    <div class="field">
+      <label>Temática</label>
+      <select id="modal-niche">
+        <option value="Inteligencia Artificial y herramientas de IA">Inteligencia Artificial</option>
+        <option value="tecnología y gadgets">Tecnología y gadgets</option>
+        <option value="negocios y emprendimiento">Negocios y emprendimiento</option>
+        <option value="marketing digital y redes sociales">Marketing digital</option>
+        <option value="finanzas personales y crypto">Finanzas personales y crypto</option>
+        <option value="ciencia y divulgación">Ciencia y divulgación</option>
+        <option value="salud y bienestar">Salud y bienestar</option>
+        <option value="noticias de actualidad">Actualidad general</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Formato</label>
+      <select id="modal-format">
+        <option value="vídeos cortos (Reels / TikTok / Shorts)">Vídeos cortos</option>
+        <option value="vídeos largos de YouTube">YouTube</option>
+        <option value="hilos de X (Twitter)">X (Twitter)</option>
+        <option value="posts de LinkedIn">LinkedIn</option>
+        <option value="newsletters">Newsletter</option>
+        <option value="podcasts">Podcast</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Modalidad</label>
+      <select id="modal-mode">
+        <option value="planificacion">📋 Planificación (batch matutino)</option>
+        <option value="goteo">⚡ Goteo (alertas en tiempo real)</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeSettings()">Cancelar</button>
+      <button class="modal-save" onclick="saveSettings()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let appState = { niche:'', format:'', mode:'planificacion', isLoading:false };
+
+// ── NOTIFICATION GATE ──
+function isIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream; }
+function isStandalone() { return window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches; }
+function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
+
+async function requestNotifPermission() {
+  if (!('Notification' in window)) { skipNotifs(); return; }
+  if (isIOS() && !isStandalone()) { showScreen('screen-ios-gate'); return; }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') notifGranted();
+  else if (perm === 'denied') showScreen('screen-blocked');
+  else skipNotifs();
+}
+function checkIOSInstalled() {
+  if (isStandalone()) requestNotifPermission();
+  else alert('Parece que todavía no has abierto ContentBot desde tu pantalla de inicio.');
+}
+function notifGranted() {
+  try { new Notification('✅ ContentBot activado', { body: 'Te avisaremos en cuanto salga la primicia.' }); } catch(e){}
+  showScreen('screen-onboard');
+}
+function skipNotifs() { showScreen('screen-onboard'); }
+
+// Si ya tiene permiso, salta el gate
+if (typeof Notification !== 'undefined' && Notification.permission === 'granted') showScreen('screen-onboard');
+
+// ── ONBOARDING ──
+function selectMode(mode) {
+  appState.mode = mode;
+  document.getElementById('mode-planificacion').classList.toggle('selected', mode === 'planificacion');
+  document.getElementById('mode-goteo').classList.toggle('selected', mode === 'goteo');
+}
+document.getElementById('setup-niche').addEventListener('change', checkReady);
+document.getElementById('setup-format').addEventListener('change', checkReady);
+function checkReady() {
+  const n = document.getElementById('setup-niche').value;
+  const f = document.getElementById('setup-format').value;
+  document.getElementById('start-btn').disabled = !(n && f);
+}
+function startApp() {
+  appState.niche = document.getElementById('setup-niche').value;
+  appState.format = document.getElementById('setup-format').value;
+  showScreen('screen-main');
+  document.getElementById('profile-display').textContent = appState.niche;
+  document.getElementById('profile-tags').innerHTML = `<span class="tag">${appState.format}</span><span class="tag">${appState.mode === 'planificacion' ? '📋 Batch' : '⚡ Goteo'}</span>`;
+  document.getElementById('chat-title').textContent = 'ContentBot — ' + appState.niche.split(' ')[0];
+  document.getElementById('chat-subtitle').textContent = appState.mode === 'planificacion' ? '📋 Modo planificación activo' : '⚡ Modo goteo activo';
+}
+
+// ── SETTINGS ──
+function openSettings() {
+  document.getElementById('modal-niche').value = appState.niche;
+  document.getElementById('modal-format').value = appState.format;
+  document.getElementById('modal-mode').value = appState.mode;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeSettings() { document.getElementById('modal-overlay').classList.remove('open'); }
+function closeSettingsOutside(e) { if (e.target === document.getElementById('modal-overlay')) closeSettings(); }
+function saveSettings() {
+  appState.niche = document.getElementById('modal-niche').value;
+  appState.format = document.getElementById('modal-format').value;
+  appState.mode = document.getElementById('modal-mode').value;
+  document.getElementById('profile-display').textContent = appState.niche;
+  document.getElementById('profile-tags').innerHTML = `<span class="tag">${appState.format}</span><span class="tag">${appState.mode === 'planificacion' ? '📋 Batch' : '⚡ Goteo'}</span>`;
+  document.getElementById('chat-subtitle').textContent = appState.mode === 'planificacion' ? '📋 Modo planificación activo' : '⚡ Modo goteo activo';
+  closeSettings();
+}
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+// ── CHAT ──
+function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
+function sendQuick(text) { document.getElementById('chat-input').value = text; sendMessage(); }
+function generateScripts() { document.getElementById('chat-input').value = 'Dame los 5 guiones de hoy'; sendMessage(); }
+function scrollBottom() { const m = document.getElementById('chat-messages'); setTimeout(() => { m.scrollTop = m.scrollHeight; }, 50); }
+function hideWelcome() { const w = document.getElementById('welcome-state'); if (w) w.remove(); }
+
+function addUserMsg(text) {
+  hideWelcome();
+  const el = document.createElement('div');
+  el.className = 'msg-user fade-in';
+  el.textContent = text;
+  document.getElementById('chat-messages').appendChild(el);
+  scrollBottom();
+}
+function addLoadingMsg() {
+  const el = document.createElement('div');
+  el.className = 'loading-msg fade-in';
+  el.id = 'loading-indicator';
+  el.innerHTML = `<div class="loading-dots"><span></span><span></span><span></span></div><div class="loading-text">Buscando últimas noticias de <strong>${appState.niche}</strong>…</div>`;
+  document.getElementById('chat-messages').appendChild(el);
+  scrollBottom();
+}
+function removeLoadingMsg() { const el = document.getElementById('loading-indicator'); if (el) el.remove(); }
+function addSystemMsg(text) {
+  const el = document.createElement('div');
+  el.className = 'msg-system fade-in';
+  el.textContent = text;
+  document.getElementById('chat-messages').appendChild(el);
+  scrollBottom();
+}
+function setLoading(val) {
+  appState.isLoading = val;
+  document.getElementById('send-btn').disabled = val;
+  document.getElementById('chat-input').disabled = val;
+  const gb = document.getElementById('generate-btn');
+  gb.disabled = val;
+  gb.innerHTML = val
+    ? '⏳ Generando…'
+    : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Generar guiones ahora`;
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text || appState.isLoading) return;
+  input.value = '';
+  input.style.height = 'auto';
+  addUserMsg(text);
+  setLoading(true);
+  addLoadingMsg();
+
+  try {
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ niche: appState.niche, format: appState.format, mode: appState.mode, text })
+    });
+    const data = await response.json();
+    removeLoadingMsg();
+
+    if (data.error) { addSystemMsg('⚠ ' + data.error); setLoading(false); return; }
+
+    let parsed;
+    try {
+      const raw = (data.content || '').replace(/```json|```/g, '').trim();
+      const s = raw.indexOf('{'); const e = raw.lastIndexOf('}');
+      parsed = JSON.parse(raw.slice(s, e + 1));
+    } catch(err) { addSystemMsg('⚠ Error al procesar la respuesta. Inténtalo de nuevo.'); setLoading(false); return; }
+
+    if (parsed.resumen) addSystemMsg('📡 ' + parsed.resumen);
+    (parsed.scripts || []).forEach((s, i) => setTimeout(() => renderScriptCard(s), i * 150));
+
+  } catch(err) {
+    removeLoadingMsg();
+    addSystemMsg('⚠ Error de conexión. Verifica tu configuración en Vercel.');
+    console.error(err);
+  }
+  setLoading(false);
+  scrollBottom();
+}
+
+function renderScriptCard(s) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-bot fade-in';
+  const words = ((s.gancho||'') + ' ' + (s.cuerpo||'') + ' ' + (s.cta||'')).split(' ').length;
+  wrap.innerHTML = `
+    <div class="script-card">
+      <div class="script-header">
+        <div style="flex:1;min-width:0;">
+          <div class="script-headline">${h(s.headline||'Sin titular')}</div>
+          ${s.source_name ? `<div class="script-source">🔗 <a href="${h(s.source_url||'#')}" target="_blank" rel="noopener">${h(s.source_name)}</a></div>` : ''}
+        </div>
+        <div class="script-num">GUIÓN #${s.num||'?'}</div>
+      </div>
+      <div class="script-body">
+        <div class="script-section"><div class="section-label label-gancho">🎯 Gancho</div><div class="section-text">${h(s.gancho||'—')}</div></div>
+        <div class="script-section"><div class="section-label label-cuerpo">📝 Cuerpo</div><div class="section-text">${h(s.cuerpo||'—')}</div></div>
+        <div class="script-section"><div class="section-label label-cta">✅ CTA</div><div class="section-text">${h(s.cta||'—')}</div></div>
+        ${s.palabras_clave ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">${s.palabras_clave.map(k=>`<span class="tag">#${h(k)}</span>`).join('')}</div>` : ''}
+      </div>
+      <div class="script-footer">
+        <div class="script-meta"><span>⏱ ${h(s.duracion||'—')}</span><span>~${words} palabras</span>${s.topic?`<span>📂 ${h(s.topic)}</span>`:''}</div>
+        <button class="script-copy" onclick="copyScript(this, ${JSON.stringify(s).replace(/"/g,'&quot;')})">Copiar guión</button>
+      </div>
+    </div>`;
+  document.getElementById('chat-messages').appendChild(wrap);
+  scrollBottom();
+}
+
+function copyScript(btn, s) {
+  const text = `📌 ${s.headline}\n🔗 ${s.source_url||s.source_name||''}\n\n🎯 GANCHO\n${s.gancho}\n\n📝 CUERPO\n${s.cuerpo}\n\n✅ CTA\n${s.cta}`;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✓ Copiado'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copiar guión'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function h(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+</script>
+</body>
+</html>
