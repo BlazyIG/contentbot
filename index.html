@@ -249,7 +249,6 @@
 <body>
 <div id="app">
 
-  <!-- ── NOTIF GATE ── -->
   <div class="screen" id="screen-notif-gate">
     <div class="gate-inner">
       <div class="gate-icon green">🔔<div class="gate-icon-ring"></div></div>
@@ -265,7 +264,6 @@
     </div>
   </div>
 
-  <!-- ── iOS GATE ── -->
   <div class="screen hidden" id="screen-ios-gate">
     <div class="gate-inner">
       <div class="gate-icon blue">📱<div class="gate-icon-ring blue-ring"></div></div>
@@ -281,7 +279,6 @@
     </div>
   </div>
 
-  <!-- ── BLOCKED GATE ── -->
   <div class="screen hidden" id="screen-blocked">
     <div class="gate-inner">
       <div class="gate-icon red">🚫</div>
@@ -297,7 +294,6 @@
     </div>
   </div>
 
-  <!-- ── ONBOARDING ── -->
   <div class="screen hidden" id="screen-onboard">
     <div class="onboard-inner" style="max-width:520px;margin:auto;padding:24px;overflow-y:auto;max-height:100vh;">
       <div class="logo-mark">
@@ -355,7 +351,6 @@
     </div>
   </div>
 
-  <!-- ── MAIN APP ── -->
   <div class="screen hidden" id="screen-main">
     <div class="sidebar" id="sidebar">
       <div class="sidebar-header">
@@ -422,7 +417,6 @@
   </div>
 </div>
 
-<!-- Settings Modal -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeSettingsOutside(event)">
   <div class="modal">
     <div class="modal-title">⚙ Configuración</div>
@@ -602,10 +596,18 @@ async function sendMessage() {
 
     let parsed;
     try {
+      // Como ahora obligamos al backend a devolver JSON, la lectura es más segura
+      parsed = JSON.parse(data.content);
+    } catch(err) { 
+      // Por si acaso devolviera algo extraño, dejamos tu fallback de regex
       const raw = (data.content || '').replace(/```json|```/g, '').trim();
       const s = raw.indexOf('{'); const e = raw.lastIndexOf('}');
-      parsed = JSON.parse(raw.slice(s, e + 1));
-    } catch(err) { addSystemMsg('⚠ Error al procesar la respuesta. Inténtalo de nuevo.'); setLoading(false); return; }
+      if (s !== -1 && e !== -1) {
+        parsed = JSON.parse(raw.slice(s, e + 1));
+      } else {
+        addSystemMsg('⚠ Error al procesar la respuesta. Inténtalo de nuevo.'); setLoading(false); return; 
+      }
+    }
 
     if (parsed.resumen) addSystemMsg('📡 ' + parsed.resumen);
     (parsed.scripts || []).forEach((s, i) => setTimeout(() => renderScriptCard(s), i * 150));
