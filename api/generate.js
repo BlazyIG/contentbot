@@ -6,7 +6,14 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
   const { niche, format, mode, text } = req.body;
-  const apiKey = process.env.GEMINI_API_KEY || 'AIzaSyBrnpbK4SPkXWDLQKQ0evkhTC60Zl4OGBw';
+  
+  // 🚨 SEGURIDAD APLICADA: La clave ahora solo se lee desde las variables de entorno.
+  // Asegúrate de ir a la configuración de Vercel (o tu hosting) y añadir la variable GEMINI_API_KEY.
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    return res.status(500).json({ error: 'Falta la API Key en las variables de entorno del servidor.' });
+  }
 
   const systemPrompt = `Eres ContentBot, un asistente experto para creadores de contenido hispanohablantes.
 Perfil del creador:
@@ -59,7 +66,8 @@ Estructura JSON obligatoria:
           tools: [{ google_search: {} }],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 4096
+            maxOutputTokens: 4096,
+            responseMimeType: "application/json" // ✅ ESTABILIDAD APLICADA: Obliga a que la respuesta sea JSON puro siempre.
           }
         })
       }
