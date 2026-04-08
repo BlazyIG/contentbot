@@ -6,26 +6,24 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
   const { niche, format, mode, text } = req.body;
-  
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'Falta la API Key en las variables de entorno.' });
+    return res.status(500).json({ error: 'Falta la API Key en las variables.' });
   }
 
-  const systemPrompt = `Eres ContentBot, un asistente experto para creadores de contenido hispanohablantes.
-Perfil del creador:
-- Temática: ${niche}
-- Formato: ${format}
-- Modalidad: ${mode === 'planificacion' ? 'Batch matutino' : 'Goteo'}
+  const prompt = `Actúa como ContentBot, un asistente experto para creadores de contenido.
+Temática: ${niche}
+Formato: ${format}
+Modalidad: ${mode === 'planificacion' ? 'Batch matutino' : 'Goteo'}
 
-Tu misión: usar Google Search para encontrar noticias REALES de hoy sobre la temática indicada y transformarlas en guiones listos para grabar.
+Busca en Google las noticias de HOY sobre esta temática y conviértelas en guiones.
 
-REGLAS DE FORMATO:
-Eres completamente libre de escribir texto normal, explicar las noticias e incluir los enlaces o citas que Google Search te pida.
-SIN EMBARGO, es obligatorio que al final de tu respuesta incluyas un bloque markdown con el JSON de los guiones.
+INSTRUCCIÓN VITAL PARA EVITAR ERRORES:
+1. PRIMERO, escribe un pequeño párrafo normal resumiendo lo que has encontrado. Aquí eres libre de poner todos los enlaces y citas que la búsqueda de Google te obligue a incluir.
+2. DESPUÉS de ese párrafo introductorio, escribe un bloque de código markdown con el JSON de los guiones.
 
-Tu respuesta DEBE contener este bloque exacto:
+Estructura del JSON obligatoria:
 \`\`\`json
 {
   "scripts": [
@@ -35,17 +33,18 @@ Tu respuesta DEBE contener este bloque exacto:
       "source_name": "Nombre del medio",
       "source_url": "https://url-real.com",
       "topic": "Etiqueta",
-      "gancho": "Texto del gancho explosivo",
+      "gancho": "Texto del gancho",
       "cuerpo": "Desarrollo de la noticia",
       "cta": "Llamada a la acción",
       "duracion": "30s",
       "palabras_clave": ["tag1", "tag2"]
     }
   ],
-  "resumen": "Resumen de lo que encontraste."
+  "resumen": "Resumen breve."
 }
 \`\`\`
-`;
+
+Petición del usuario: ${text || 'Busca las noticias de hoy y dame los guiones.'}`;
 
   try {
     const response = await fetch(
@@ -54,14 +53,13 @@ Tu respuesta DEBE contener este bloque exacto:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [
             {
               role: 'user',
-              parts: [{ text: text || 'Busca las noticias más recientes de hoy y dame los guiones listos para grabar.' }]
+              parts: [{ text: prompt }]
             }
           ],
-          tools: [{ google_search: {} }],
+          tools: [{ googleSearch: {} }],
           generationConfig: {
             temperature: 0.7
           }
@@ -73,7 +71,7 @@ Tu respuesta DEBE contener este bloque exacto:
 
     if (!data.candidates || !data.candidates[0]?.content?.parts) {
       console.error('Error Gemini vacío:', JSON.stringify(data));
-      return res.status(500).json({ error: 'La IA encontró las noticias pero se bloqueó al escribirlas. Vuelve a pulsar el botón.' });
+      return res.status(500).json({ error: 'La IA se bloqueó al formatear los enlaces. Inténtalo de nuevo.' });
     }
 
     const fullText = data.candidates[0].content.parts
@@ -85,6 +83,6 @@ Tu respuesta DEBE contener este bloque exacto:
 
   } catch (error) {
     console.error('Error servidor:', error);
-    return res.status(500).json({ error: 'Error de conexión con la IA.' });
+    return res.status(500).json({ error: 'Error de conexión.' });
   }
 }
