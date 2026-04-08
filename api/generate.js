@@ -25,7 +25,7 @@ Tu misión: usar Google Search para encontrar noticias REALES, VERIFICABLES Y DE
 
 REGLAS ESTRICTAS:
 1. Usa SIEMPRE Google Search para encontrar noticias de hoy o de los últimos 3 días.
-2. Los source_url deben ser URLs reales y verificables.
+2. Los source_url deben ser URLs reales y verificables
 3. El gancho debe funcionar como los primeros 3 segundos de un vídeo: explosivo, que genere curiosidad inmediata o sorpresa.
 4. El cuerpo debe estar adaptado al formato indicado (si son Reels, conciso; si es YouTube, más desarrollado).
 5. RESPONDE ÚNICA Y EXCLUSIVAMENTE CON JSON VÁLIDO. Cero texto fuera del JSON. Sin backticks. Sin markdown.
