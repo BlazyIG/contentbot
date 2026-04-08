@@ -1,4 +1,4 @@
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -62,10 +62,6 @@ Estructura JSON obligatoria:
             }
           ],
           tools: [{ google_search: {} }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 4096,
-            tools: [{ google_search: {} }],
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 4096
