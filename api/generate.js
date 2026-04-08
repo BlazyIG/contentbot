@@ -12,39 +12,32 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: 'Falta la API Key en las variables.' });
   }
 
-  const prompt = `Actúa como ContentBot, un asistente experto para creadores de contenido.
+  const prompt = `Eres ContentBot, un asistente experto para creadores de contenido.
 Temática: ${niche}
 Formato: ${format}
-Modalidad: ${mode === 'planificacion' ? 'Batch matutino' : 'Goteo'}
 
-Busca en Google las noticias de HOY sobre esta temática y conviértelas en guiones.
+Genera 5 guiones basados en las tendencias, noticias y novedades más recientes sobre esta temática.
 
-INSTRUCCIÓN VITAL PARA EVITAR ERRORES:
-1. PRIMERO, escribe un pequeño párrafo normal resumiendo lo que has encontrado. Aquí eres libre de poner todos los enlaces y citas que la búsqueda de Google te obligue a incluir.
-2. DESPUÉS de ese párrafo introductorio, escribe un bloque de código markdown con el JSON de los guiones.
-
-Estructura del JSON obligatoria:
-\`\`\`json
+Estructura JSON obligatoria:
 {
   "scripts": [
     {
       "num": 1,
-      "headline": "Titular real",
-      "source_name": "Nombre del medio",
-      "source_url": "https://url-real.com",
+      "headline": "Titular de la novedad",
+      "source_name": "Nombre de un medio de referencia",
+      "source_url": "https://url-de-ejemplo.com",
       "topic": "Etiqueta",
-      "gancho": "Texto del gancho",
-      "cuerpo": "Desarrollo de la noticia",
+      "gancho": "Texto del gancho explosivo",
+      "cuerpo": "Desarrollo del contenido",
       "cta": "Llamada a la acción",
       "duracion": "30s",
       "palabras_clave": ["tag1", "tag2"]
     }
   ],
-  "resumen": "Resumen breve."
+  "resumen": "Frase breve resumiendo las tendencias."
 }
-\`\`\`
 
-Petición del usuario: ${text || 'Busca las noticias de hoy y dame los guiones.'}`;
+Petición del usuario: ${text || 'Dame los guiones listos.'}`;
 
   try {
     const response = await fetch(
@@ -59,9 +52,9 @@ Petición del usuario: ${text || 'Busca las noticias de hoy y dame los guiones.'
               parts: [{ text: prompt }]
             }
           ],
-          tools: [{ googleSearch: {} }],
           generationConfig: {
-            temperature: 0.7
+            temperature: 0.7,
+            responseMimeType: "application/json"
           }
         })
       }
@@ -71,7 +64,7 @@ Petición del usuario: ${text || 'Busca las noticias de hoy y dame los guiones.'
 
     if (!data.candidates || !data.candidates[0]?.content?.parts) {
       console.error('Error Gemini vacío:', JSON.stringify(data));
-      return res.status(500).json({ error: 'La IA se bloqueó al formatear los enlaces. Inténtalo de nuevo.' });
+      return res.status(500).json({ error: 'La IA se bloqueó. Inténtalo de nuevo.' });
     }
 
     const fullText = data.candidates[0].content.parts
