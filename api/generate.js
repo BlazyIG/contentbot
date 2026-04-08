@@ -10,39 +10,42 @@ module.exports = async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'Falta la API Key en las variables.' });
+    return res.status(500).json({ error: 'Falta la API Key en las variables de entorno.' });
   }
 
   const systemPrompt = `Eres ContentBot, un asistente experto para creadores de contenido hispanohablantes.
-Perfil:
+Perfil del creador:
 - Temática: ${niche}
 - Formato: ${format}
+- Modalidad: ${mode === 'planificacion' ? 'Batch matutino' : 'Goteo'}
 
-Misión: Buscar noticias REALES Y DE HOY sobre la temática. Crea un guion estructurado para cada noticia.
+Tu misión: usar Google Search para encontrar noticias REALES de hoy sobre la temática indicada y transformarlas en guiones listos para grabar.
 
-REGLAS:
-1. Usa la búsqueda de Google para encontrar noticias de hoy o los últimos 3 días.
-2. Devuelve la respuesta conteniendo UN bloque JSON válido delimitado por \`\`\`json y \`\`\`.
-3. Puedes añadir texto adicional o citas de la búsqueda si el sistema lo requiere, pero el bloque JSON debe estar completo.
+REGLAS DE FORMATO:
+Eres completamente libre de escribir texto normal, explicar las noticias e incluir los enlaces o citas que Google Search te pida.
+SIN EMBARGO, es obligatorio que al final de tu respuesta incluyas un bloque markdown con el JSON de los guiones.
 
-Estructura JSON obligatoria:
+Tu respuesta DEBE contener este bloque exacto:
+\`\`\`json
 {
   "scripts": [
     {
       "num": 1,
-      "headline": "Titular de la noticia",
+      "headline": "Titular real",
       "source_name": "Nombre del medio",
       "source_url": "https://url-real.com",
       "topic": "Etiqueta",
-      "gancho": "Texto gancho para atrapar",
-      "cuerpo": "Desarrollo completo",
+      "gancho": "Texto del gancho explosivo",
+      "cuerpo": "Desarrollo de la noticia",
       "cta": "Llamada a la acción",
       "duracion": "30s",
       "palabras_clave": ["tag1", "tag2"]
     }
   ],
-  "resumen": "Frase breve resumiendo lo que has encontrado."
-}`;
+  "resumen": "Resumen de lo que encontraste."
+}
+\`\`\`
+`;
 
   try {
     const response = await fetch(
@@ -55,10 +58,10 @@ Estructura JSON obligatoria:
           contents: [
             {
               role: 'user',
-              parts: [{ text: text || 'Busca noticias de hoy y dame los guiones listos.' }]
+              parts: [{ text: text || 'Busca las noticias más recientes de hoy y dame los guiones listos para grabar.' }]
             }
           ],
-          tools: [{ googleSearch: {} }],
+          tools: [{ google_search: {} }],
           generationConfig: {
             temperature: 0.7
           }
@@ -69,8 +72,8 @@ Estructura JSON obligatoria:
     const data = await response.json();
 
     if (!data.candidates || !data.candidates[0]?.content?.parts) {
-      console.error('Error Gemini:', JSON.stringify(data));
-      return res.status(500).json({ error: 'Gemini buscó la información pero se bloqueó al redactarla. Inténtalo de nuevo.' });
+      console.error('Error Gemini vacío:', JSON.stringify(data));
+      return res.status(500).json({ error: 'La IA encontró las noticias pero se bloqueó al escribirlas. Vuelve a pulsar el botón.' });
     }
 
     const fullText = data.candidates[0].content.parts
@@ -82,6 +85,6 @@ Estructura JSON obligatoria:
 
   } catch (error) {
     console.error('Error servidor:', error);
-    return res.status(500).json({ error: 'Error de conexión.' });
+    return res.status(500).json({ error: 'Error de conexión con la IA.' });
   }
 }
