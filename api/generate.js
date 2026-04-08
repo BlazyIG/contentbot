@@ -7,8 +7,6 @@ module.exports = async function handler(req, res) {
 
   const { niche, format, mode, text } = req.body;
   
-  // 🚨 SEGURIDAD APLICADA: La clave ahora solo se lee desde las variables de entorno.
-  // Asegúrate de ir a la configuración de Vercel (o tu hosting) y añadir la variable GEMINI_API_KEY.
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -25,33 +23,34 @@ Tu misión: usar Google Search para encontrar noticias REALES, VERIFICABLES Y DE
 
 REGLAS ESTRICTAS:
 1. Usa SIEMPRE Google Search para encontrar noticias de hoy o de los últimos 3 días.
-2. Los source_url deben ser URLs reales y verificables
+2. Los source_url deben ser URLs reales y verificables.
 3. El gancho debe funcionar como los primeros 3 segundos de un vídeo: explosivo, que genere curiosidad inmediata o sorpresa.
-4. El cuerpo debe estar adaptado al formato indicado (si son Reels, conciso; si es YouTube, más desarrollado).
-5. RESPONDE ÚNICA Y EXCLUSIVAMENTE CON JSON VÁLIDO. Cero texto fuera del JSON. Sin backticks. Sin markdown.
+4. El cuerpo debe estar adaptado al formato indicado.
+5. RESPONDE ÚNICA Y EXCLUSIVAMENTE CON JSON VÁLIDO. Cero texto fuera del JSON.
 
 Estructura JSON obligatoria:
 {
   "scripts": [
     {
       "num": 1,
-      "headline": "Titular real y atractivo de la noticia",
-      "source_name": "Nombre del medio (ej: TechCrunch, El País, Xataka)",
-      "source_url": "https://url-real-del-articulo.com",
-      "topic": "Etiqueta corta (ej: IA, Crypto, Apple)",
-      "gancho": "Texto exacto del gancho para los primeros 3 segundos. Pregunta o afirmación explosiva que enganche al instante.",
-      "cuerpo": "Desarrollo completo: contexto, por qué importa ahora, datos clave, comparativa o ejemplo. Redactado para el formato ${format}.",
-      "cta": "Llamada a la acción: qué debe hacer el espectador (guardar, comentar, seguir, compartir).",
+      "headline": "Titular",
+      "source_name": "Nombre del medio",
+      "source_url": "https://url-real.com",
+      "topic": "Etiqueta",
+      "gancho": "Texto gancho",
+      "cuerpo": "Desarrollo",
+      "cta": "Llamada a la acción",
       "duracion": "30s",
-      "palabras_clave": ["tag1", "tag2", "tag3"]
+      "palabras_clave": ["tag1", "tag2"]
     }
   ],
-  "resumen": "Frase breve resumiendo el lote: qué noticias has encontrado y por qué son relevantes ahora."
+  "resumen": "Frase breve resumiendo."
 }`;
 
   try {
     const response = await fetch(
-     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -66,7 +65,7 @@ Estructura JSON obligatoria:
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 4096,
-            responseMimeType: "application/json" // ✅ ESTABILIDAD APLICADA: Obliga a que la respuesta sea JSON puro siempre.
+            responseMimeType: "application/json"
           }
         })
       }
@@ -76,7 +75,7 @@ Estructura JSON obligatoria:
 
     if (!data.candidates || !data.candidates[0]?.content?.parts) {
       console.error('Error Gemini:', JSON.stringify(data));
-      return res.status(500).json({ error: 'Gemini no devolvió contenido. Inténtalo de nuevo.' });
+      return res.status(500).json({ error: 'Gemini no devolvió contenido.' });
     }
 
     const fullText = data.candidates[0].content.parts
@@ -88,6 +87,6 @@ Estructura JSON obligatoria:
 
   } catch (error) {
     console.error('Error servidor:', error);
-    return res.status(500).json({ error: 'Error de conexión con Gemini.' });
+    return res.status(500).json({ error: 'Error de conexión.' });
   }
 }
